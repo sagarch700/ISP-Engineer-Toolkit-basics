@@ -1,0 +1,116 @@
+-------------------------------------------------OSPF-----------------------------------------------------------------
+
+sh ip ospf border-routers --> shows ABR Router-id reachability with metric and next-hop.
+sh ip ospf <process> <area> database summary <IP> self-originate --> The LSA that R1 floods to area mentioned.
+sh ip ospf database summary <ip> adv-router <RID> --> shows the LSA that the router received from the adv-router RID.
+sh ip ospf <interface command> --> shows almost all needed details: DR/BDR, cost, priority, whether it is ABR/ASBR etc.
+OSPF Non-broadcast network to use for more security and when network doesn't support multicast. all packets will be unicast. neighbor is 
+configured statically. 224.0.0.6. there will be a DR/BDR.
+OSPF Point-to-multipoint is hub and spoke model. 224.0.0.5 can be used.
+Ethernet interface defaults to broadcast.
+Tunnel and Serial interface defaults to P2P.
+DR election is not pre-emptive.
+Loopbacks are sent as stub /32 networks.
+OSPF external routes are not redistributed by default.
+redistribute ospf 1 match internal external 2 metric <bw> <delay> <reliability> <load> <mtu> --> to restribute both inter and intra area routes.
+sh ip ospf rib redistribution --> show the redistributed routes to OSPF.
+debug ip routing --> shows prefix addition to rib.
+sh ip ospf database self-originate | begin type-5
+route-based tags are much better than prefix-based filtering cause they are dynamic enough for fast changing environments.
+You can filter redistribute routes by: AD method (default), prefix filter using route maps, tag based using route maps.
+
+By default these metrics used by various protocols when routes are redistributed. we call them default seed metric.
+	RIP & EIGRP: infinty --> it means it won't advertise it further.
+	OSPF: 20 and 1 when redistributing BGP routes.
+	BGP: uses the IGP metric value.
+	
+
+------------------------------------------------BGP------------------------------------------------------------------------
+
+sh bgp ipv4 unicast <ip> longer-prefix --> shows the subordinate suppressed routes and the aggregate address you'r advertising summar-only.
+when you have multiple network commands inculding the sub-ordinate routes and a summary command with advertise summary only. only the summary route is adv.
+origin code: ? for redistributed routes and i for network command routes.
+default-information originate always <metric> --> it always advertise default route with the metric to it's peers irrespective of whether default route
+in routing table or not.
+by default external OSPF LSA are type 2.
+one can originate default route with route-map. This will ensure that default route is only advertised when the routes in the route-map are present in RIB.
+neighbor <RID> transport connection-mode active --> makes the BGP Peer TCP Client that will actively initiate the sessions.
+RR can send the routes from RR clients to clients, non-clients, and EBGP peers.
+RR doesn't change BGP Next-hop
+RR appends two more fileds to avoid loop.
+	originator ID: BGP RID of the device advertising/originating the IP from the RR perspective.
+	Cluster-list: list of the RR's in the path. if RR originates the route then RR doesn't create cluster-list. removes cluster-list when sent to EBGP.
+BGP local-as <AS number> no-prepend replace-as --> this will ensure that your real AS is not present in the BGP routes advertised with new local-as.
+
+----------------------------------------------------URPF---------------------------------------------------------------------
+
+Ward off spoofing attack.
+An attacker can spoof source address and intiate icmp echo packets to a destination router. the destination router in turn send the unsolicited icmp reply
+to the atcual network device with that source address leading to CPU utilisation and transit link wastage.
+Router will check the source is reachable from the same link on which the packet is recieved. This is called Strict mode.
+use loose mode when you think there might be asymmetrical routing. in this method Router will only check routing table, not the RIB + interface.
+# ip verify unicast source reachable-via rx --> for strict mode
+# ip verify unicast source reachable-via any --> for loose mode
+you can log the drops using numbered acl with log with URPF. if you permit any IP in that acl, then that IP will be excluded from URPF check.
+# ip verify unicast source reachable-via rx <numbered acl>.
+
+
+------------------------------------------------------MPLS Transport and L3VPNS Multi-tenancy----------------------------------------------
+
+MPLS header 32-bit header. label is 20-bit. Exp is 3 bit is mpls QOS 8 QOS class.S is 1 bit, it used to tell the position of mpls stack, set to 1
+if it is the last header before the IP payload, all other set to 0. TTL is 8-bit, TTL copied from IP packet unless you block this.
+LDP uses Link local mutlicast.
+MPLS LDP runs on top of IGP. IGP is the decision maker for any path.
+in LDP, the router advertising the route usually tells it peers what labels it uses for this prefix and the peer should use this lable while sending the
+packets on mpls network.
+LSP's are uni-directional.
+you can create label range using this command: mpls lable range <left limit> <right limit>.
+LDP uses both TCP & UDP
+	LDP UDP: hellos to 224.0.0.2 (this is all routers link local mutlicast group).neighbors keep track of hello packets even when tcp sess not establis.
+	LDP TCP: Session between RIDs.
+show mpls interfaces --> shows on interfaces mpls is enabled.
+show mpls ldp discovery --> for mpls discovery stats.
+show mpls ldp neighbor --> to verify the neighbors are up
+debug mpls ldp transport events --> to debug mpls ldp evebts
+LDP binds lables non-BGP routes by default.
+show mpls ldp bindings <ip subnet> --> shows label bindings
+show mpls forwarding-table labels --> shows LFIB
+BGP VPN route is 96 bit:32-bit ip address plus 64-bit RD value.
+BGP update message has this VPN route + RT values + next-hop + VPN label
+Bottom lable is VPN label, top label is LDP transport label.
+VPN ID: keeps the BGP routes unique as this prepended to the IP routes.
+RT ensures to import those routes to VRF routing table.
+when routes are copied from the VRF table to the BGP routing tables, Export-tag is applied.
+mpls labesl in/out : in means local VPN label & out means remote VPN label.
+VRF-LITE Hairpin Security routing: this is to hairpin the traffic to pass it via some security device --> Very IMP.
+
+----------------------------------------------------------IP SLA--------------------------------------------------------
+
+4 main capabilities.
+	Test Reachability.
+	Troubleshoot Network paths. path validation using path echo & path jitter.
+	Validate services: act as DNS, HTTP or FTP client.
+	measure performance: jitter, RTT, packet loss, one way latency, or voice performance. this is handled by udp jitter operation.
+IP SLA timeout:- how long until probe/router keep running until the probe/router gives up and mark it fail.
+Successful probes are compared with their threshold. indicates soft-failure.
+sh ip sla stasistics.
+sh ip sla transponder
+inside track you can give delay up --> it means it will wait till that time before making the ip sla state up.
+show track <number> --> it will shows the state of ipsla that is being tracked.
+sh ip sla summary
+
+-----------------------------------------------------------Radius Vs TACACS+--------------------------------------
+Radius is usually used for securing remote access to networks and network services against unauthorised access.
+TACACS+ is usually used for adminstartor access to network devices.
+Radius: standards-based. TACACS+: cisco propreitary
+Radius: udp 1812 (auth & authorisation combined in radius) and 1813 (accounting). Tacacs+ uses TCP port 49.
+Raidus: Encrypts only password. TACACS+: encrypts everything.
+TACACS+ provide flexble command authorisation.
+Netflow uses UDP port 2055
+
+
+
+
+
+ 
+
